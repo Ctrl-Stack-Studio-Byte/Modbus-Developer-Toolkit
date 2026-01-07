@@ -17,12 +17,15 @@ namespace ModbusSimulator {
     // Use 'volatile' to ensure the most up-to-date value is read across threads.
     private volatile bool _isRunning;
 
+    private short _noiseRange;
+    private double _globalStep;
     public SimulatorEngine(string address, ushort port) { 
       _hostAddress = address;
       _hostPort = port;
       _MTS = new ModbusTcpServer();
       _generator = new DataGenerator();
-      
+      _noiseRange = 3;
+      _globalStep = 0;
     }
 
     public void start() {
@@ -51,12 +54,23 @@ namespace ModbusSimulator {
 
             // Inside the while loop of SimulatorEngine:
             // Base: 25.0°C (250), Amplitude: ±5.0°C (50), Period: 60 seconds
-            buffer[0] = _generator.getSineWaveValue(250, 50, 60);
+            // Both channels now use the exact same _globalStep
+            // Channel 0: Noisy Sine Wave (Temperature)
+            buffer[0] = _generator.getNoisySineValue(250,50,60, _globalStep,_noiseRange);
+            // Channel 1: Ideal Sine Wave (Reference)
+            buffer[1] = _generator.getSineWaveValue(250,50,60, _globalStep);
+            // Channel 1: Linear Ramp (e.g., Water Level 0 to 1000, increment by 5 per second)
+            buffer[2] = _generator.getRampValue(0, 1000, 100, _globalStep);
 
+            // Output for monitoring
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] | " +
+              $"IdealTemperature: {buffer[1] / 10.0}°C | " +
+              $"NoisyTemperature: {buffer[0] / 10.0}°C | " +
+              $"Level: {buffer[2] / 10.0}%" +
+              $"Count: {_globalStep}.");
 
-            buffer[1]++;
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Temperature: {buffer[0] / 10.0}°C | Count: {buffer[1]}.");
-          
+            // Increment the global clock once per loop iteration
+            _globalStep++;
           } catch(Exception ex) {
             Console.WriteLine($"Loop Error: {ex.Message}");
           }
