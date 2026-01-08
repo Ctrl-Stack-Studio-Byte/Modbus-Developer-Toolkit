@@ -63,11 +63,29 @@ namespace ModbusSimulator {
             buffer[2] = _generator.getRampValue(0, 1000, 100, _globalStep);
 
             // Output for monitoring
-            Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] | " +
+            Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd-HH:mm:ss}] | " +
               $"IdealTemperature: {buffer[1] / 10.0}°C | " +
               $"NoisyTemperature: {buffer[0] / 10.0}°C | " +
               $"Level: {buffer[2] / 10.0}%" +
               $"Count: {_globalStep}.");
+
+            /// <summary>
+            /// Prepares and logs telemetry data by packaging buffer values and the global step.
+            /// </summary>
+            /// <remarks>
+            /// This snippet captures the current state of real-time buffers and synchronizes 
+            /// them with the simulation timer (_globalStep) for persistent storage.
+            /// </remarks>
+            // 1. Initialize a data package with a fixed size to hold buffer values and the step counter
+            double[] values = new double[4];
+            // 2. Map real-time buffer values to the telemetry array
+            values[0] = buffer[0];
+            values[1] = buffer[1];
+            values[2] = buffer[2];
+            // 3. Attach the global simulation step for time-series synchronization
+            values[3] = _globalStep;
+            // 4. Delegate the persistent storage task to the data generator's logging utility
+            _generator.saveToCSV(values);
 
             // Increment the global clock once per loop iteration
             _globalStep++;

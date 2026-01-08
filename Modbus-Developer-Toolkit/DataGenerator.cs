@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -81,6 +82,26 @@ namespace ModbusSimulator {
         return (short)Math.Round(result);
       }
     }
+
+    /// <summary>
+    /// Appends an array of telemetry data to a local CSV file with a timestamp.
+    /// </summary>
+    /// <param name="values">An array of double values representing different sensor signals or data points.</param>
+    /// <remarks>
+    /// This method uses a StreamWriter in append mode. 
+    /// It leverages string.Join for flexibility across different array lengths.
+    /// </remarks>
+    public void saveToCSV(double[] values) {
+      string filePath = "Log.csv";
+
+      using(StreamWriter sw = new StreamWriter(filePath,true)) {
+        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
+        sw.WriteLine($"{timestamp},{string.Join(",",values)}");
+      }
+    
+    }
+
+
 
   }
 }
