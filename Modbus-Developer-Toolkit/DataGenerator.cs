@@ -90,15 +90,35 @@ namespace ModbusSimulator {
     /// <remarks>
     /// This method uses a StreamWriter in append mode. 
     /// It leverages string.Join for flexibility across different array lengths.
+    /// It leverages CultureInfo.InvariantCulture to ensure date-time formatting remains consistent across different OS locales.
     /// </remarks>
     public void saveToCSV(double[] values) {
+      // Guard clause: Prevent processing if data is invalid or missing.
+      if(values == null || values.Length == 0) {
+        return;
+      }
+
+      // Define the target log file path
       string filePath = "Log.csv";
 
-      using(StreamWriter sw = new StreamWriter(filePath,true)) {
-        string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss");
-        sw.WriteLine($"{timestamp},{string.Join(",",values)}");
+      try {
+        // Open the file in append mode (true) to prevent overwriting
+        using(StreamWriter sw = new StreamWriter(filePath, true)) {
+          // Use InvariantCulture to ensure consistent timestamp format regardless of system regional settings.
+          string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+          // Serialize data into CSV format: Timestamp,Value1,Value2...
+          sw.WriteLine($"{timestamp},{string.Join(",", values)}");
+        }
+
+      } catch(Exception ex) {
+        // Log the error to console if file access fails (e.g., file is open in Excel)
+        Console.WriteLine($"Error saving data to CSV: {ex.Message}");
+
       }
-    
+        
+
+        
+      
     }
 
 
