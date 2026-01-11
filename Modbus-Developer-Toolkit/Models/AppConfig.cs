@@ -1,14 +1,40 @@
 ﻿
-namespace ModbusSimulator {
+namespace ModbusSimulator.Models {
   public class AppConfig {
-    /// <summary>
-    /// The name of the output CSV file. Default is "Log.csv".
-    /// </summary>
-    public string LogFileName { get; set; } = "Log.csv";
+    // --- Network Settings ---
 
     /// <summary>
-    /// The delay between each data collection in milliseconds.
+    /// Local IP address the Modbus server will bind to. Use "127.0.0.1" for local testing.
+    /// </summary>
+    public string HostAddress { get; set; } = "127.0.0.1";
+
+    /// <summary>
+    /// TCP port for the Modbus server. Standard Modbus is 502, but 50200 is used for non-admin testing.
+    /// </summary>
+    public ushort HostPort { get; set; } = 50200;
+
+    // --- Simulation Core Settings ---
+
+    /// <summary>
+    /// Execution frequency of the background simulation loop in milliseconds.
     /// </summary>
     public int SamplingIntervalMs { get; set; } = 1000;
+
+    /// <summary>
+    /// The range of random fluctuation (jitter) added to the simulated signals.
+    /// </summary>
+    public short NoiseRange { get; set; } = 3;
+
+    // --- Data Persistence (Logging) ---
+
+    /// <summary>
+    /// Enables or disables CSV data logging to the local disk.
+    /// </summary>
+    public bool IsLoggingEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Destination filename for telemetry data. Example: "Simulation_Results.csv".
+    /// </summary>
+    public string LogFileName { get; set; } = "Log.csv";
   }
 }

@@ -1,46 +1,55 @@
 ﻿using FluentModbus;
+using ModbusSimulator.Models;
 using System;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 
-namespace ModbusSimulator {
+namespace ModbusSimulator.Services {
+  /// <summary>
+  /// Core engine responsible for managing the Modbus server lifecycle and background simulation data flow.
+  /// </summary>
   internal class SimulatorEngine {
+    private readonly AppConfig _appConfig;
+    private readonly ModbusTcpServer _MTS;
+    private readonly DataGenerator _generator;
 
-    private string _hostAddress;
-    private ushort _hostPort;
-    private ModbusTcpServer _MTS;
-    private DataGenerator _generator;
+    /// <summary>
+    /// Flag to control the background simulation thread safely across different threads.
+    /// </summary>
     // Use 'volatile' to ensure the most up-to-date value is read across threads.
     private volatile bool _isRunning;
-
-    private short _noiseRange;
     private double _globalStep;
-    public SimulatorEngine(string address, ushort port) { 
-      _hostAddress = address;
-      _hostPort = port;
+
+    /// <summary>
+    /// Initializes a new instance of the engine with injected configuration settings.
+    /// </summary>
+    /// <param name="config">The application configuration object.</param>
+    public SimulatorEngine(AppConfig config) {
+      _appConfig = config;
       _MTS = new ModbusTcpServer();
       _generator = new DataGenerator();
-      _noiseRange = 3;
       _globalStep = 0;
     }
 
+    /// <summary>
+    /// Starts the Modbus TCP server and begins the asynchronous data simulation loop.
+    /// </summary>
     public void start() {
       // Set the flag to true before starting the background task.
       _isRunning = true;
-      _MTS.Start(new IPEndPoint(IPAddress.Parse(_hostAddress),_hostPort));
-      Console.WriteLine("Modbus Server Started on Port 50200...");
 
-      short[] registers = new short[10];
+      // Establish the network endpoint using configured IP and Port.
+      _MTS.Start(new IPEndPoint(IPAddress.Parse(_appConfig.HostAddress), _appConfig.HostPort));
+      Console.WriteLine($"Modbus Server Started on {_appConfig.HostAddress}:{_appConfig.HostPort}...");
 
-      // Background Task: Simulates the internal logic of a PLC/Sensor.
-      // Periodically updates the Modbus holding registers with simulated data.
+      // Spawn a background task to decouple simulation logic from the UI/Main thread.
       Task.Run(() => {
         Console.WriteLine("--- Background Loop Started ---");
         // The loop will exit gracefully when _isRunning is set to false.
         while(_isRunning) {
           try {
-          
+            // Access the shared Modbus register buffer.
             var buffer = _MTS.GetHoldingRegisters();
 
             // Modbus registers only support 16-bit integers (short).
@@ -53,7 +62,7 @@ namespace ModbusSimulator {
             // Base: 25.0°C (250), Amplitude: ±5.0°C (50), Period: 60 seconds
             // Both channels now use the exact same _globalStep
             // Channel 0: Noisy Sine Wave (Temperature)
-            buffer[0] = _generator.getNoisySineValue(250,50,60, _globalStep,_noiseRange);
+            buffer[0] = _generator.getNoisySineValue(250,50,60, _globalStep, _appConfig.NoiseRange);
             // Channel 1: Ideal Sine Wave (Reference)
             buffer[1] = _generator.getSineWaveValue(250,50,60, _globalStep);
             // Channel 1: Linear Ramp (e.g., Water Level 0 to 1000, increment by 5 per second)
@@ -73,16 +82,10 @@ namespace ModbusSimulator {
             /// This snippet captures the current state of real-time buffers and synchronizes 
             /// them with the simulation timer (_globalStep) for persistent storage.
             /// </remarks>
-            // 1. Initialize a data package with a fixed size to hold buffer values and the step counter
-            double[] values = new double[4];
-            // 2. Map real-time buffer values to the telemetry array
-            values[0] = buffer[0];
-            values[1] = buffer[1];
-            values[2] = buffer[2];
-            // 3. Attach the global simulation step for time-series synchronization
-            values[3] = _globalStep;
-            // 4. Delegate the persistent storage task to the data generator's logging utility
-            _generator.saveToCSV(values);
+            // Persistent Logging
+            // Packages real-time data and the sync clock for CSV storage.
+            double[] values = { buffer[0], buffer[1], buffer[2], _globalStep };
+            _generator.saveToCSV(values, _appConfig.LogFileName, _appConfig.IsLoggingEnabled);
 
             // Increment the global clock once per loop iteration
             _globalStep++;
@@ -90,8 +93,8 @@ namespace ModbusSimulator {
             Console.WriteLine($"Loop Error: {ex.Message}");
           }
 
-
-          Thread.Sleep(1000);
+          // Dynamic Loop Timing: Controlled by the configuration file.
+          Thread.Sleep(_appConfig.SamplingIntervalMs);
         }
         // This line executes after the while loop finishes.
         Console.WriteLine("--- Background Loop Gracefully Stopped. ---");
@@ -101,7 +104,9 @@ namespace ModbusSimulator {
 
     }
 
-
+    /// <summary>
+    /// Signals the engine to stop and performs resource cleanup.
+    /// </summary>
     public void stop() {
       // Signal the background loop to stop.
       _isRunning = false;
@@ -120,7 +125,7 @@ namespace ModbusSimulator {
     public void waitForExitCommand() {
 
       Console.WriteLine("Press 'q' to Exit:");
-      while(Console.ReadLine() != "q") {
+      while(Console.ReadLine()?.ToLower() != "q") {
         // Keep waiting until 'q' is entered.
       }
 

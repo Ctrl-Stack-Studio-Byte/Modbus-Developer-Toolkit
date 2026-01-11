@@ -1,7 +1,7 @@
 ﻿using System;
 using System.IO;
 
-namespace ModbusSimulator {
+namespace ModbusSimulator.Services {
   public class DataGenerator {
 
 
@@ -82,39 +82,37 @@ namespace ModbusSimulator {
     /// <summary>
     /// Appends an array of telemetry data to a local CSV file with a timestamp.
     /// </summary>
-    /// <param name="values">An array of double values representing different sensor signals or data points.</param>
+    /// <param name="values">An array of double values representing sensor signals.</param>
+    /// <param name="filePath">The destination file path defined in the configuration.</param>
+    /// <param name="isEnabled">A toggle to enable or disable persistent logging.</param>
     /// <remarks>
-    /// This method uses a StreamWriter in append mode. 
-    /// It leverages string.Join for flexibility across different array lengths.
-    /// It leverages CultureInfo.InvariantCulture to ensure date-time formatting remains consistent across different OS locales.
+    /// This method ensures cross-platform consistency by using InvariantCulture.
+    /// It automatically handles file creation if the specified file does not exist.
     /// </remarks>
-    public void saveToCSV(double[] values) {
-      // Guard clause: Prevent processing if data is invalid or missing.
-      if(values == null || values.Length == 0) {
+    public void saveToCSV(double[] values, string filePath, bool isEnabled) {
+      // Guard clause: Skip processing if logging is disabled or data is null/empty.
+      // This prevents unnecessary disk overhead and potential NullReferenceExceptions.
+      if(!isEnabled || values == null || values.Length == 0) {
         return;
       }
 
-      // Define the target log file path
-      string filePath = "Log.csv";
-
       try {
-        // Open the file in append mode (true) to prevent overwriting
+        // Open the file in append mode (true). 
+        // Using 'using' statement ensures the file stream is closed and disposed correctly.
         using(StreamWriter sw = new StreamWriter(filePath, true)) {
-          // Use InvariantCulture to ensure consistent timestamp format regardless of system regional settings.
+
+          // Format timestamp using InvariantCulture to avoid regional date-time format conflicts.
           string timestamp = DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
-          // Serialize data into CSV format: Timestamp,Value1,Value2...
+
+          // Transform array into a comma-separated string and write as a new line.
+          // Example Output: 2026-01-11 21:42:00,25.5,24.8,0.5
           sw.WriteLine($"{timestamp},{string.Join(",", values)}");
         }
-
       } catch(Exception ex) {
-        // Log the error to console if file access fails (e.g., file is open in Excel)
-        Console.WriteLine($"Error saving data to CSV: {ex.Message}");
-
+        // Error handling for common IO issues (e.g., file locked by Excel, permission denied).
+        Console.WriteLine($"[Storage Error]: Failed to write to {filePath}. Details: {ex.Message}");
       }
-        
 
-        
-      
     }
 
 
