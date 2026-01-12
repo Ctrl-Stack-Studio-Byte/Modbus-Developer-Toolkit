@@ -100,6 +100,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Models\RegisterChannel.cs" />
     <Compile Include="Services\ConfigHandler.cs" />
     <Compile Include="UI\App.cs" />
     <Compile Include="Models\AppConfig.cs" />

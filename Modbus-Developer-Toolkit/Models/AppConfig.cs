@@ -1,4 +1,7 @@
 ﻿
+using Newtonsoft.Json;
+using System.Collections.Generic;
+
 namespace ModbusSimulator.Models {
   public class AppConfig {
     // --- Network Settings ---
@@ -36,5 +39,14 @@ namespace ModbusSimulator.Models {
     /// Destination filename for telemetry data. Example: "Simulation_Results.csv".
     /// </summary>
     public string LogFileName { get; set; } = "Log.csv";
+
+    /// <summary>
+    /// A list of configured channels to be simulated.
+    /// </summary>
+    [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
+    public List<RegisterChannel> Channels { get; set; } = new List<RegisterChannel>() {
+      new RegisterChannel { Name = "Sine_Sample", Address = 0, SignalType = "Sine", BaseValue = 250, Amplitude = 50, Period = 60 },
+      new RegisterChannel { Name = "Ramp_Sample", Address = 1, SignalType = "Ramp", Min = 0, Max = 1000, StepSize = 100 }
+    };
   }
 }

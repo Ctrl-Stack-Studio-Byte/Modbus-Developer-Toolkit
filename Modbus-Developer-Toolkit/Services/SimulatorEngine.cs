@@ -1,6 +1,7 @@
 ﻿using FluentModbus;
 using ModbusSimulator.Models;
 using System;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
@@ -30,6 +31,8 @@ namespace ModbusSimulator.Services {
       _MTS = new ModbusTcpServer();
       _generator = new DataGenerator();
       _globalStep = 0;
+
+      Console.WriteLine($"[Debug] Total channels loaded: {_appConfig.Channels.Count}");
     }
 
     /// <summary>
@@ -62,18 +65,63 @@ namespace ModbusSimulator.Services {
             // Base: 25.0°C (250), Amplitude: ±5.0°C (50), Period: 60 seconds
             // Both channels now use the exact same _globalStep
             // Channel 0: Noisy Sine Wave (Temperature)
-            buffer[0] = _generator.getNoisySineValue(250,50,60, _globalStep, _appConfig.NoiseRange);
+            //buffer[0] = _generator.getNoisySineValue(250,50,60, _globalStep, _appConfig.NoiseRange);
             // Channel 1: Ideal Sine Wave (Reference)
-            buffer[1] = _generator.getSineWaveValue(250,50,60, _globalStep);
+            //buffer[1] = _generator.getSineWaveValue(250,50,60, _globalStep);
             // Channel 1: Linear Ramp (e.g., Water Level 0 to 1000, increment by 5 per second)
-            buffer[2] = _generator.getRampValue(0, 1000, 100, _globalStep);
+            //buffer[2] = _generator.getRampValue(0, 1000, 100, _globalStep);
 
+            // Data-Driven Update: Iterate through all configured channels
+            // This loop handles N channels without needing any code changes
+            foreach(var ch in _appConfig.Channels) {
+              short value = 0;
+
+              // Strategy Pattern: Select the algorithm based on the SignalType defined in JSON
+              if(ch.SignalType == "Sine") {
+                // Calculate sine wave value with noise using the global synchronized clock
+                value = _generator.getNoisySineValue(
+                    ch.BaseValue,
+                    ch.Amplitude,
+                    ch.Period,
+                    _globalStep,
+                    _appConfig.NoiseRange
+                );
+              } else if(ch.SignalType == "Ramp") {
+                // Calculate sawtooth ramp value based on Min, Max, and StepSize
+                value = _generator.getRampValue(
+                    ch.Min,
+                    ch.Max,
+                    ch.StepSize,
+                    _globalStep
+                );
+              }
+
+              // Write the calculated value to the specific Modbus address defined in config.
+              // This decouples the logic from hard-coded array indices.
+              buffer[ch.Address] = value;
+              // Also write the calculated value to the config.
+              ch.CurrentValue = value;
+            }
+
+            // 3. Monitoring: Output synchronization status to the console
+            if(_appConfig.IsLoggingEnabled) {
+              //Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updated {_appConfig.Channels.Count} channels at Step: {_globalStep}");
+
+              // Use string.Join to create a clean single-line output for all channels
+              var displayInfo = string.Join(" | ", _appConfig.Channels.Select(c => $"{c.Name}: {c.CurrentValue / 10.0}"));
+              Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {displayInfo} | Step: {_globalStep}");
+
+
+            }
+
+            /*
             // Output for monitoring
             Console.WriteLine($"[{DateTime.Now:yyyy-MM-dd-HH:mm:ss}] | " +
               $"IdealTemperature: {buffer[1] / 10.0}°C | " +
               $"NoisyTemperature: {buffer[0] / 10.0}°C | " +
               $"Level: {buffer[2] / 10.0}%" +
               $"Count: {_globalStep}.");
+            */
 
             /// <summary>
             /// Prepares and logs telemetry data by packaging buffer values and the global step.
@@ -84,8 +132,8 @@ namespace ModbusSimulator.Services {
             /// </remarks>
             // Persistent Logging
             // Packages real-time data and the sync clock for CSV storage.
-            double[] values = { buffer[0], buffer[1], buffer[2], _globalStep };
-            _generator.saveToCSV(values, _appConfig.LogFileName, _appConfig.IsLoggingEnabled);
+            //double[] values = { buffer[0], buffer[1], buffer[2], _globalStep };
+            //_generator.saveToCSV(values, _appConfig.LogFileName, _appConfig.IsLoggingEnabled);
 
             // Increment the global clock once per loop iteration
             _globalStep++;
