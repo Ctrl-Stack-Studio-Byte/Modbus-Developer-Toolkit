@@ -26,7 +26,7 @@ namespace ModbusSimulator.Models {
     /// <summary>
     /// The range of random fluctuation (jitter) added to the simulated signals.
     /// </summary>
-    public short NoiseRange { get; set; } = 3;
+    //public short NoiseRange { get; set; } = 3;
 
     // --- Data Persistence (Logging) ---
 
@@ -45,7 +45,7 @@ namespace ModbusSimulator.Models {
     /// </summary>
     [JsonProperty(ObjectCreationHandling = ObjectCreationHandling.Replace)]
     public List<RegisterChannel> Channels { get; set; } = new List<RegisterChannel>() {
-      new RegisterChannel { Name = "Sine_Sample", Address = 0, SignalType = "Sine", BaseValue = 250, Amplitude = 50, Period = 60 },
+      new RegisterChannel { Name = "Sine_Sample", Address = 0, SignalType = "Sine", BaseValue = 250, Amplitude = 50, Period = 60, NoiseRange = 0 },
       new RegisterChannel { Name = "Ramp_Sample", Address = 1, SignalType = "Ramp", Min = 0, Max = 1000, StepSize = 100 }
     };
   }

@@ -32,7 +32,7 @@ namespace ModbusSimulator.Services {
       _generator = new DataGenerator();
       _globalStep = 0;
 
-      Console.WriteLine($"[Debug] Total channels loaded: {_appConfig.Channels.Count}");
+      //Console.WriteLine($"[Debug] Total channels loaded: {_appConfig.Channels.Count}");
     }
 
     /// <summary>
@@ -44,7 +44,10 @@ namespace ModbusSimulator.Services {
 
       // Establish the network endpoint using configured IP and Port.
       _MTS.Start(new IPEndPoint(IPAddress.Parse(_appConfig.HostAddress), _appConfig.HostPort));
-      Console.WriteLine($"Modbus Server Started on {_appConfig.HostAddress}:{_appConfig.HostPort}...");
+      //Console.WriteLine($"Modbus Server Started on {_appConfig.HostAddress}:{_appConfig.HostPort}...");
+
+      // Display Configuration once
+      this.PrintSystemHeader();
 
       // Spawn a background task to decouple simulation logic from the UI/Main thread.
       Task.Run(() => {
@@ -84,7 +87,7 @@ namespace ModbusSimulator.Services {
                     ch.Amplitude,
                     ch.Period,
                     _globalStep,
-                    _appConfig.NoiseRange
+                    ch.NoiseRange // Injecting the channel-specific noise range
                 );
               } else if(ch.SignalType == "Ramp") {
                 // Calculate sawtooth ramp value based on Min, Max, and StepSize
@@ -108,9 +111,11 @@ namespace ModbusSimulator.Services {
               //Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] Updated {_appConfig.Channels.Count} channels at Step: {_globalStep}");
 
               // Use string.Join to create a clean single-line output for all channels
+              // Log real-time telemetry data with minimal overhead
+              // CurrentValue / 10.0 assumes the raw data is stored as an integer (deciscale)
               var displayInfo = string.Join(" | ", _appConfig.Channels.Select(c => $"{c.Name}: {c.CurrentValue / 10.0}"));
               Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {displayInfo} | Step: {_globalStep}");
-
+              
 
             }
 
@@ -179,6 +184,32 @@ namespace ModbusSimulator.Services {
 
     }
 
+    /// <summary>
+    /// Prints a one-time summary of the channel configurations and their physical boundaries.
+    /// This helps operators verify the system setup before data streaming begins.
+    /// </summary>
+    private void PrintSystemHeader() {
+      Console.ForegroundColor = ConsoleColor.Cyan;
+
+      //System Status
+      Console.WriteLine("\n" + new string('=', 60));
+      Console.WriteLine($"[STATUS] Server: {_appConfig.HostAddress}:{_appConfig.HostPort} | Channels: {_appConfig.Channels.Count}");
+      Console.WriteLine($"[TIME  ] {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+      Console.WriteLine(new string('=', 60));
+
+      Console.WriteLine("\n" + new string('=', 60));
+      Console.WriteLine($"SYSTEM STARTUP - {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+      Console.WriteLine(new string('=', 60));
+
+      foreach(var ch in _appConfig.Channels) {
+        // Aligning columns for better readability in the console
+        // DynamicRangeDisplay shows the pre-configured physical boundaries
+        Console.WriteLine($"{ch.Name,-15} | Addr: {ch.Address,-5} | {ch.DynamicRangeDisplay}");
+      }
+
+      Console.WriteLine(new string('=', 60) + "\n");
+      Console.ResetColor();
+    }
 
 
   }

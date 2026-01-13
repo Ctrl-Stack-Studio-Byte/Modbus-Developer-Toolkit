@@ -27,7 +27,7 @@ namespace ModbusSimulator.Models {
     /// <summary>
     /// The maximum deviation from the base value.
     /// </summary>
-    public double Amplitude { get; set; } = 5;
+    public double Amplitude { get; set; } = 0;
 
     /// <summary>
     /// The time (in iterations/steps) it takes to complete one full cycle.
@@ -53,5 +53,18 @@ namespace ModbusSimulator.Models {
     /// The latest calculated value for this channel (scaled value).
     /// </summary>
     public short CurrentValue { get; set; } = 0;
+
+    /// <summary>
+    /// Defines the maximum magnitude of random environmental noise for this specific channel.
+    /// Used to simulate real-world interference (e.g., thermal noise or sensor instability).
+    /// </summary>
+    public short NoiseRange { get; set; } = 0;
+
+    /// <summary>
+    /// Calculates the expected theoretical boundary of the signal.
+    /// Useful for UI scaling and setting up alarm thresholds in the monitoring system.
+    /// </summary>
+    public string DynamicRangeDisplay =>
+        $"Typical Range: [{BaseValue - Amplitude - NoiseRange:F2} ~ {BaseValue + Amplitude + NoiseRange:F2}]";
   }
 }
