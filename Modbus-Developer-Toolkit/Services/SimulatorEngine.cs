@@ -1,8 +1,11 @@
 ﻿using FluentModbus;
 using ModbusSimulator.Models;
+using ModbusSimulator.Services.Strategies;
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Runtime.Remoting.Channels;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -14,7 +17,8 @@ namespace ModbusSimulator.Services {
     private readonly AppConfig _appConfig;
     private readonly ModbusTcpServer _MTS;
     private readonly DataGenerator _generator;
-
+    // A thread-safe dictionary to map signal type names to their respective strategies
+    private readonly Dictionary<string, ISignalStrategy> _strategies;
     /// <summary>
     /// Flag to control the background simulation thread safely across different threads.
     /// </summary>
@@ -31,7 +35,11 @@ namespace ModbusSimulator.Services {
       _MTS = new ModbusTcpServer();
       _generator = new DataGenerator();
       _globalStep = 0;
-
+      // Initialize the strategy library
+      _strategies = new Dictionary<string, ISignalStrategy> {
+            { "Sine", new SineStrategy() },
+            { "Ramp", new RampStrategy() }
+        };
       //Console.WriteLine($"[Debug] Total channels loaded: {_appConfig.Channels.Count}");
     }
 
@@ -74,37 +82,42 @@ namespace ModbusSimulator.Services {
             // Channel 1: Linear Ramp (e.g., Water Level 0 to 1000, increment by 5 per second)
             //buffer[2] = _generator.getRampValue(0, 1000, 100, _globalStep);
 
+            /*
             // Data-Driven Update: Iterate through all configured channels
             // This loop handles N channels without needing any code changes
-            foreach(var ch in _appConfig.Channels) {
+            foreach(var channel in _appConfig.Channels) {
               short value = 0;
 
               // Strategy Pattern: Select the algorithm based on the SignalType defined in JSON
-              if(ch.SignalType == "Sine") {
+              if(channel.SignalType == "Sine") {
                 // Calculate sine wave value with noise using the global synchronized clock
                 value = _generator.getNoisySineValue(
-                    ch.BaseValue,
-                    ch.Amplitude,
-                    ch.Period,
+                    channel.BaseValue,
+                    channel.Amplitude,
+                    channel.Period,
                     _globalStep,
-                    ch.NoiseRange // Injecting the channel-specific noise range
+                    channel.NoiseRange // Injecting the channel-specific noise range
                 );
-              } else if(ch.SignalType == "Ramp") {
+              } else if(channel.SignalType == "Ramp") {
                 // Calculate sawtooth ramp value based on Min, Max, and StepSize
                 value = _generator.getRampValue(
-                    ch.Min,
-                    ch.Max,
-                    ch.StepSize,
+                    channel.Min,
+                    channel.Max,
+                    channel.StepSize,
                     _globalStep
                 );
               }
 
               // Write the calculated value to the specific Modbus address defined in config.
               // This decouples the logic from hard-coded array indices.
-              buffer[ch.Address] = value;
+              buffer[channel.Address] = value;
               // Also write the calculated value to the config.
-              ch.CurrentValue = value;
+              channel.CurrentValue = value;
             }
+            */
+
+            // Refresh all channel data and synchronize with the Modbus register map.
+            this.UpdateSignals(buffer);
 
             // 3. Monitoring: Output synchronization status to the console
             if(_appConfig.IsLoggingEnabled) {
@@ -115,7 +128,7 @@ namespace ModbusSimulator.Services {
               // CurrentValue / 10.0 assumes the raw data is stored as an integer (deciscale)
               var displayInfo = string.Join(" | ", _appConfig.Channels.Select(c => $"{c.Name}: {c.CurrentValue / 10.0}"));
               Console.WriteLine($"[{DateTime.Now:HH:mm:ss}] {displayInfo} | Step: {_globalStep}");
-              
+
 
             }
 
@@ -153,7 +166,7 @@ namespace ModbusSimulator.Services {
         Console.WriteLine("--- Background Loop Gracefully Stopped. ---");
 
       });
-      
+
 
     }
 
@@ -209,6 +222,30 @@ namespace ModbusSimulator.Services {
 
       Console.WriteLine(new string('=', 60) + "\n");
       Console.ResetColor();
+    }
+
+    private void UpdateSignals(Span<short> buffer) {
+      // The high-level loop: just tells the engine to process each channel
+      foreach(var channel in _appConfig.Channels) {
+        ProcessSingleChannel(channel,buffer);
+      }
+    }
+    /// <summary>
+    /// Handles the logic for a single register channel.
+    /// Separating this makes the code easier to test and maintain.
+    /// </summary>
+    private void ProcessSingleChannel(RegisterChannel rc, Span<short> buffer) {
+      // Attempt to retrieve the calculation strategy
+      if(_strategies.TryGetValue(rc.SignalType, out var strategy)) {
+        // 1. Calculate the new value
+        rc.CurrentValue = strategy.Calculate(rc, _globalStep, _generator);
+
+        // 2. Update the Modbus data buffer
+        buffer[rc.Address] = rc.CurrentValue;
+      } else {
+        // Fallback or logging if signal type is unknown
+        Console.WriteLine($"Signal type '{rc.SignalType}' is not supported.");
+      }
     }
 
 
