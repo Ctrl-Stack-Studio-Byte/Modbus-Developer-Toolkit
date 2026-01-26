@@ -13,7 +13,7 @@ namespace ModbusSimulator.Services {
   /// <summary>
   /// Core engine responsible for managing the Modbus server lifecycle and background simulation data flow.
   /// </summary>
-  internal class SimulatorEngine {
+  public class SimulatorEngine {
     private readonly AppConfig _appConfig;
     private readonly ModbusTcpServer _MTS;
     private readonly DataGenerator _generator;
